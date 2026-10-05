@@ -6,18 +6,19 @@ file(READ ${NINFER_DEVICE_PROFILES_FILE} NINFER_DEVICE_PROFILES_JSON)
 # feat/anti-loop: MSVC 19.44 rejects raw string literals of ~30KB with C2026
 # (observed on the device-route-profiles table; split at a line boundary into
 # two concatenated raw literals so each chunk stays well under the limit).
+set(_ninfer_nl "\n")
+set(NINFER_DEVICE_PROFILES_LITERALS "")
+set(_ninfer_chunk_size 8000)
 string(LENGTH "${NINFER_DEVICE_PROFILES_JSON}" _ninfer_profiles_len)
-math(EXPR _ninfer_profiles_half "(${_ninfer_profiles_len} + 1) / 2")
-string(SUBSTRING "${NINFER_DEVICE_PROFILES_JSON}" 0 ${_ninfer_profiles_half} NINFER_DEVICE_PROFILES_JSON_A)
-string(SUBSTRING "${NINFER_DEVICE_PROFILES_JSON}" ${_ninfer_profiles_half} -1 NINFER_DEVICE_PROFILES_JSON_B)
-# 块边界对齐：把 A 末段最后一个换行之后的残行挪到 B 开头
-string(FIND "${NINFER_DEVICE_PROFILES_JSON_A}" "\n" _ninfer_last_nl REVERSE)
-if(_ninfer_last_nl GREATER -1)
-  math(EXPR _ninfer_split "_ninfer_last_nl + 1")
-  string(SUBSTRING "${NINFER_DEVICE_PROFILES_JSON_A}" ${_ninfer_split} -1 _ninfer_tail)
-  string(SUBSTRING "${NINFER_DEVICE_PROFILES_JSON_A}" 0 ${_ninfer_last_nl} NINFER_DEVICE_PROFILES_JSON_A)
-  set(NINFER_DEVICE_PROFILES_JSON_B "${_ninfer_tail}${NINFER_DEVICE_PROFILES_JSON_B}")
-endif()
+set(_ninfer_off 0)
+set(_ninfer_idx 0)
+while(_ninfer_off LESS _ninfer_profiles_len)
+  string(SUBSTRING "${NINFER_DEVICE_PROFILES_JSON}" ${_ninfer_off} ${_ninfer_chunk_size} _ninfer_chunk)
+  string(APPEND NINFER_DEVICE_PROFILES_LITERALS "R\"ninfer_c${_ninfer_idx}(${_ninfer_chunk})ninfer_c${_ninfer_idx}\"")
+  math(EXPR _ninfer_off "_ninfer_off + _ninfer_chunk_size")
+  math(EXPR _ninfer_idx "_ninfer_idx + 1")
+endwhile()
+
 configure_file(engine/device_profiles_builtin.cpp.in
                ${CMAKE_CURRENT_BINARY_DIR}/engine/device_profiles_builtin.cpp @ONLY)
 
