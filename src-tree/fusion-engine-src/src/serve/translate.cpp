@@ -428,6 +428,12 @@ ninfer::RequestOptions to_request_options(const GenerationRequest& request,
             request.thinking_budget ? request.thinking_budget : server.default_thinking_budget;
     }
     options.execution.sampling             = resolve_sampling_overrides(request.sampling, server);
+    // feat/anti-loop: thinking-channel presence. Applied AFTER the request/server
+    // merge so it wins over the global --presence-penalty for thinking-mode
+    // requests only; 0.0 (default) keeps legacy behaviour bit-for-bit.
+    if (semantics.enable_thinking != false && server.thinking_presence_penalty != 0.0F) {
+        options.execution.sampling.presence_penalty = server.thinking_presence_penalty;
+    }
     options.execution.post_thinking_sampling =
         resolve_post_thinking_overrides(request.post_thinking, server);
     options.execution.first_token_top_logprobs = request.first_token_top_logprobs;

@@ -943,6 +943,34 @@ void parse_reasoning_effort(const Json& body, GenerationRequest& output) {
     output.reasoning_effort = *parsed;
 }
 
+// feat/anti-loop: expose the per-request thinking budget on the OpenAI route.
+// The pipeline already exists (request.h thinking_budget field, translate.cpp
+// consumption with server.default_thinking_budget fallback, engine execution);
+// only this JSON parse was missing. budget=0/null means "unset".
+// Validation mirrors the Anthropic route: >= 1024 when set; the engine rejects
+// budgets exceeding the request's remaining capacity on its own.
+void parse_thinking_budget(const Json& body, GenerationRequest& output) {
+    if (!body.contains("thinking_budget") || body.at("thinking_budget").is_null()) { return; }
+    const Json& value = body.at("thinking_budget");
+    if (!value.is_number_integer() && !value.is_number_unsigned()) {
+        bad_request("thinking_budget must be a non-negative integer or null", "thinking_budget");
+    }
+    if (value.is_number_integer() && value.get<std::int64_t>() < 0) {
+        bad_request("thinking_budget must be a non-negative integer or null", "thinking_budget");
+    }
+    const std::uint64_t budget = value.get<std::uint64_t>();
+    if (budget > 0xFFFFFFFFULL) {
+        bad_request("thinking_budget exceeds uint32 range", "thinking_budget");
+    }
+    if (budget != 0 && budget < 1024) {
+        bad_request("thinking_budget must be 0 (unset) or an integer of at least 1024",
+                    "thinking_budget");
+    }
+    if (budget != 0) {
+        output.thinking_budget = static_cast<std::uint32_t>(budget);
+    }
+}
+
 void parse_stream_options(const Json& body, OpenAIChatRequest& output) {
     output.stream = get_bool(body, "stream", false);
     if (!body.contains("stream_options") || body.at("stream_options").is_null()) { return; }
@@ -1015,6 +1043,7 @@ OpenAIChatRequest parse_chat_completion_request(const Json& body, const RequestL
     parse_response_observations(body, output);
     parse_output_limit(body, limits, output);
     parse_reasoning_effort(body, output.generation);
+    parse_thinking_budget(body, output.generation);
     const TemplateOptions template_options      = parse_template_options(body);
     output.generation.enable_thinking           = template_options.enable_thinking;
     output.generation.preserve_thinking         = template_options.preserve_thinking;

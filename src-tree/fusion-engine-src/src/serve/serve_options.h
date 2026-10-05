@@ -105,6 +105,12 @@ struct ServeOptions {
     std::optional<bool> enable_thinking;
     std::optional<bool> preserve_thinking;
     std::optional<std::uint32_t> default_thinking_budget;
+    // feat/anti-loop: thinking-channel-only presence penalty. Applied at request
+    // translation ONLY for thinking-mode requests; 0.0 (default) keeps legacy
+    // behaviour. Rationale: the thinking channel's official presence is 0.0, which
+    // lets vocabulary recursion burn the whole output budget (04-doc symptom #7),
+    // while a GLOBAL presence would corrupt tool-call XML (04-doc L1 constraint).
+    float thinking_presence_penalty = 0.0F;
     // Effort for requests that name none; a request that disables thinking is left alone.
     std::optional<RequestedReasoningEffort> default_reasoning_effort;
     // End-of-thinking message fed to the model when it hits the thinking budget; empty

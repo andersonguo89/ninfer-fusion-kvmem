@@ -686,6 +686,10 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         } else if (arg == "--frequency-penalty") {
             options.sampling_overrides.frequency_penalty = parse_float_in(
                 require_value("--frequency-penalty"), "frequency-penalty", -2.0f, 2.0f);
+        } else if (arg == "--thinking-presence-penalty") {
+            options.thinking_presence_penalty = parse_float_in(
+                require_value("--thinking-presence-penalty"), "thinking-presence-penalty",
+                -2.0f, 2.0f);
         } else if (arg == "--seed") {
             options.sampling_overrides.seed = parse_u64(require_value("--seed"), "seed");
         } else if (arg == "--greedy") {
