@@ -428,11 +428,21 @@ ninfer::RequestOptions to_request_options(const GenerationRequest& request,
             request.thinking_budget ? request.thinking_budget : server.default_thinking_budget;
     }
     options.execution.sampling             = resolve_sampling_overrides(request.sampling, server);
-    // feat/anti-loop: thinking-channel presence. Applied AFTER the request/server
-    // merge so it wins over the global --presence-penalty for thinking-mode
-    // requests only; 0.0 (default) keeps legacy behaviour bit-for-bit.
-    if (semantics.enable_thinking != false && server.thinking_presence_penalty != 0.0F) {
-        options.execution.sampling.presence_penalty = server.thinking_presence_penalty;
+    // feat/anti-loop: thinking-channel presence with a standard override chain:
+    // request.thinking_presence_penalty > server --thinking-presence-penalty > 0.
+    // Applied AFTER the request/server merge and only for thinking-mode requests,
+    // so the tool-call (non-thinking) channel keeps the global presence untouched.
+    // Explicit request 0 disables the thinking presence for adaptive-guard usage.
+    if (semantics.enable_thinking != false) {
+        std::optional<float> thinking_presence;
+        if (request.thinking_presence_penalty) {
+            thinking_presence = request.thinking_presence_penalty;
+        } else if (server.thinking_presence_penalty != 0.0F) {
+            thinking_presence = server.thinking_presence_penalty;
+        }
+        if (thinking_presence && *thinking_presence != 0.0F) {
+            options.execution.sampling.presence_penalty = *thinking_presence;
+        }
     }
     options.execution.post_thinking_sampling =
         resolve_post_thinking_overrides(request.post_thinking, server);
